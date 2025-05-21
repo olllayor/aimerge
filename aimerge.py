@@ -4,24 +4,24 @@ import os
 import argparse
 import subprocess
 import re
-from openai import OpenAI
+import google.generativeai as genai
 from dotenv import load_dotenv  # Keep this if you use .env for your own dev convenience
 
 # --- Configuration ---
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".aimerge")
-API_KEY_FILE = os.path.join(CONFIG_DIR, "api_key.txt")
+API_KEY_FILE = os.path.join(CONFIG_DIR, "google_api_key.txt")
 
 
 def load_api_key():
     """
-    Loads the OpenAI API key.
+    Loads the Google API key.
     Priority:
-    1. Environment variable OPENAI_API_KEY
-    2. Key from ~/.aimerge/api_key.txt
+    1. Environment variable GOOGLE_API_KEY
+    2. Key from ~/.aimerge/google_api_key.txt
     """
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("GOOGLE_API_KEY")
     if api_key:
-        print("INFO: Loaded API key from OPENAI_API_KEY environment variable.")
+        print("INFO: Loaded API key from GOOGLE_API_KEY environment variable.")
         return api_key
 
     if os.path.exists(API_KEY_FILE):
@@ -37,31 +37,34 @@ def load_api_key():
 
 
 def save_api_key(api_key):
-    """Saves the API key to the config file."""
+    """Saves the Google API key to the config file."""
     try:
         os.makedirs(CONFIG_DIR, exist_ok=True)
         with open(API_KEY_FILE, "w") as f:
             f.write(api_key)
         os.chmod(API_KEY_FILE, 0o600)
-        print(f"INFO: API key saved to {API_KEY_FILE}.")
+        print(f"INFO: Google API key saved to {API_KEY_FILE}.")
         print("INFO: For security, ensure this file remains readable only by you.")
         return True
     except Exception as e:
-        print(f"ERROR: Could not save API key to {API_KEY_FILE}: {e}")
+        print(f"ERROR: Could not save Google API key to {API_KEY_FILE}: {e}")
         return False
 
 
-def get_openai_client(api_key_val):
-    """Initializes and returns the OpenAI client if API key is valid."""
+def get_gemini_client(api_key_val):
+    """Initializes and returns the Google Gemini client if API key is valid."""
     if not api_key_val:
+        print("ERROR: API key not provided for Gemini client.")
         return None
     try:
-        client = OpenAI(api_key=api_key_val)
-        client.models.list()  # Test API key
-        print("INFO: OpenAI API key validated successfully.")
-        return client
+        genai.configure(api_key=api_key_val)
+        # Test the API key by trying to get model info
+        genai.get_model('models/gemini-1.5-flash-latest') # This will raise an exception if key is bad
+        model = genai.GenerativeModel("gemini-1.5-flash-latest")
+        print("INFO: Google Gemini API key validated and client initialized successfully.")
+        return model
     except Exception as e:
-        print(f"ERROR: OpenAI API key seems invalid or connection failed: {e}")
+        print(f"ERROR: Google Gemini API key seems invalid or connection failed: {e}")
         return None
 
 
@@ -154,8 +157,8 @@ def parse_conflict_hunks(file_content):
 
 
 def get_ai_resolution(client, ours, theirs, base=None, filename=""):
-    """Gets a proposed resolution from OpenAI."""
-    # Basic prompt, needs significant refinement!
+    """Gets a proposed resolution from Google Gemini."""
+    # Prompt for Google Gemini.
     prompt_parts = [
         f"You are an expert Git merge conflict resolver. Analyze the following conflict from the file '{filename}'.",
         "OURS (HEAD):",
@@ -177,38 +180,31 @@ def get_ai_resolution(client, ours, theirs, base=None, filename=""):
     )
     prompt = "\n".join(prompt_parts)
 
-    print("\nDEBUG: Sending prompt to OpenAI:")
+    print("\nDEBUG: Sending prompt to Gemini:")
     # print(prompt) # Can be very verbose
     print("OURS:\n" + ours)
     print("THEIRS:\n" + theirs)
     print("Asking AI for resolution...")
 
     try:
-        completion = client.chat.completions.create(
-            model="gpt-3.5-turbo",  # Or gpt-4 if budget allows and user prefers
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are an expert software developer helping resolve Git merge conflicts.",
-                },
-                {"role": "user", "content": prompt},
-            ],
-        )
-        ai_suggestion = completion.choices[0].message.content.strip()
+        # For Gemini, the client is the model itself.
+        # The system role is incorporated into the main prompt.
+        response = client.generate_content(prompt)
+        ai_suggestion = response.text.strip()
         # Potentially parse out explanation if we ask for it in a structured way
-        return ai_suggestion, "AI explanation placeholder."  # TODO: Extract explanation
+        return ai_suggestion, "Gemini AI explanation placeholder."  # TODO: Extract explanation for Gemini
     except Exception as e:
-        print(f"ERROR: OpenAI API call failed: {e}")
+        print(f"ERROR: Google Gemini API call failed: {e}")
         return None, None
 
 
 def process_file_conflicts(client, filepath):
-    """Processes all conflicts in a single file, focusing only on AI resolution."""
+    """Processes all conflicts in a single file using Google Gemini for resolution proposals."""
     try:
         with open(filepath, "r", encoding="utf-8") as f:
             original_content = f.read()
     except Exception as e:
-        print(f"Error reading file {filepath}: {e}")
+        print(f"ERROR: Could not read file {filepath}. Details: {e}")
         return False
 
     new_content_parts = []
@@ -218,10 +214,10 @@ def process_file_conflicts(client, filepath):
     # Check if any actual conflict hunks exist
     found_conflicts = any(hunk_data["type"] == "conflict" for hunk_data in hunks)
     if not found_conflicts:
-        # This case should ideally not be hit if find_conflicted_files is accurate,
-        # but good to handle. If the file was listed as conflicted but has no markers
-        # (e.g., resolved manually before aimerge runs on it), we do nothing.
-        # print(f"No conflict markers found in {filepath} by the parser.")
+        # This case can be hit if find_conflicted_files is accurate but the file was resolved
+        # manually before aimerge processes it, or if the parser fails to find markers
+        # that `git diff --diff-filter=U` detected.
+        print(f"INFO: No conflict markers found by parser in {os.path.basename(filepath)}. Skipping.")
         return True  # No changes needed from aimerge's perspective
 
     modified_this_file = False
@@ -251,21 +247,21 @@ def process_file_conflicts(client, filepath):
 
         applied_ai_suggestion_for_this_hunk = False
         if ai_suggestion:
-            print("AI PROPOSAL:")
+            print("GEMINI AI PROPOSAL:")
             print(ai_suggestion)
-            # print(f"AI Explanation: {ai_explanation}") # TODO
+            # print(f"Gemini AI Explanation: {ai_explanation}") # TODO
             print("-" * 20)
 
             while True:
-                # Simplified choice: Apply AI or leave as is (manual/skip)
+                # Choice: Apply AI, keep original, or (future) manual edit.
                 choice = input(
-                    "Apply AI suggestion? (y)es / (n)o, keep original conflict: "
+                    "Apply Gemini AI suggestion? (y)es / (n)o, keep original conflict: "
                 ).lower()
                 if choice == "y":
                     new_content_parts.append(ai_suggestion)
                     modified_this_file = True
                     applied_ai_suggestion_for_this_hunk = True
-                    print("AI suggestion marked for application.")
+                    print("Gemini AI suggestion marked for application.")
                     break
                 elif choice == "n":
                     new_content_parts.append(
@@ -276,7 +272,7 @@ def process_file_conflicts(client, filepath):
                 else:
                     print("Invalid choice. Please enter 'y' or 'n'.")
         else:
-            print("AI could not provide a suggestion for this hunk.")
+            print("Gemini AI could not provide a suggestion for this hunk.")
             new_content_parts.append(
                 hunk_data["original_block"]
             )  # Keep original conflict
@@ -285,28 +281,30 @@ def process_file_conflicts(client, filepath):
         try:
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write("".join(new_content_parts))
-            print(f"\nINFO: Updated {filepath} with accepted AI resolutions.")
+            print(f"\nINFO: Successfully updated {os.path.basename(filepath)} with accepted Gemini AI resolutions.")
             return True
         except Exception as e:
-            print(f"Error writing changes to {filepath}: {e}")
+            print(f"ERROR: Could not write changes to {filepath}. Details: {e}")
             return False
     elif found_conflicts:  # Conflicts were found, but no AI suggestions were applied
         print(
-            f"\nINFO: No AI resolutions were applied to {filepath}. Original conflicts remain where AI was not used or failed."
+            f"\nINFO: No Gemini AI resolutions were applied to {os.path.basename(filepath)}. Original conflicts remain where Gemini AI was not used or failed."
         )
         return True  # Still considered success in terms of processing, just no changes made by AI
 
-    return True  # Should be caught by "not found_conflicts" earlier if no conflicts
+    # This case should ideally be caught by "not found_conflicts" earlier if no conflicts.
+    # If it reaches here, it means found_conflicts was false initially.
+    return True
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AIMerge - AI Powered Merge Conflict Resolver. Run with no arguments in a Git repo with conflicts."
+        description="AIMerge - Merge conflicts in Git with Google Gemini. Run with no arguments in a Git repo with conflicts."
     )
     parser.add_argument(
         "--set-api-key",
         metavar="YOUR_API_KEY",
-        help="Set your OpenAI API key. Example: aimerge --set-api-key sk-...",
+        help="Set your Google API key. Example: aimerge --set-api-key YOUR_GOOGLE_API_KEY",
     )
 
     args = parser.parse_args()
@@ -314,181 +312,102 @@ def main():
 
     if args.set_api_key:
         if save_api_key(args.set_api_key):
-            print("API key set successfully.")
+            print("INFO: Google API key set successfully.")
         else:
-            print("Failed to save API key.")
+            print("ERROR: Failed to save Google API key.") # Message improved
         return 0
 
     api_key = load_api_key()
     if not api_key:
-        print("ERROR: OpenAI API key not found.")
+        print("ERROR: Google API key not found or could not be loaded.") # Message improved
         print(
-            "To set it up, run: `git aimerge --set-api-key YOUR_OPENAI_KEY_HERE`"
-        )  # Updated to suggest git aimerge
-        print("Or set the OPENAI_API_KEY environment variable.")
-        print("Get your key from https://platform.openai.com/api-keys")
+            "To set it up, run: `aimerge --set-api-key YOUR_GOOGLE_API_KEY_HERE`"
+        )
+        print("Or set the GOOGLE_API_KEY environment variable.")
+        print("Get your key from Google AI Studio: https://aistudio.google.com/app/apikey")
         return 1
 
-    client = get_openai_client(api_key)
+    client = get_gemini_client(api_key)
     if not client:
+        # get_gemini_client() already prints specific errors
+        print("ERROR: Failed to initialize Google Gemini client. Please check your API key and network connection.")
         return 1
 
-    print("INFO: AIMerge initialized with your OpenAI API key.")
+    print("INFO: AIMerge initialized with your Google Gemini API key.") # Added Gemini
 
     repo_root = find_git_repo_root()
     if not repo_root:
-        print("ERROR: Not inside a Git repository or Git is not installed.")
+        # find_git_repo_root() already prints specific error
         return 1
 
-    conflicted_f_paths = find_conflicted_files(repo_root)  # Renamed for clarity
+    conflicted_f_paths = find_conflicted_files(repo_root)
     if not conflicted_f_paths:
-        print("INFO: No conflicted files found in this Git repository.")
+        print("INFO: No conflicted files found in this Git repository. Nothing to do.") # Message improved
         return 0
 
-    print(f"Found {len(conflicted_f_paths)} conflicted file(s):")
+    print(f"INFO: Found {len(conflicted_f_paths)} conflicted file(s) to process:")
     for f_path in conflicted_f_paths:
         print(f"  - {os.path.relpath(f_path, repo_root)}")
 
-    overall_success = True
-    any_modifications_made_by_aimerge = False
+    all_files_processed_successfully = True
+    any_ai_modifications_applied = False
 
     for f_path in conflicted_f_paths:
         print(f"\n>>> Processing conflicts in: {os.path.relpath(f_path, repo_root)}")
-        # process_file_conflicts now returns True if processing occurred,
-        # and implies modification if content was actually changed.
-        # We need to know if it *tried* to modify and succeeded.
-        # A better return might be a tuple: (processed_ok, was_modified)
+        
+        # process_file_conflicts returns True if the file was processed (even if no changes made),
+        # and False if a critical error occurred (like file read/write error).
+        # We also need to track if any AI suggestions were actually applied.
+        # Let's assume process_file_conflicts will be updated to return a tuple: (success, modified_by_ai)
+        # For now, we'll adapt to its current boolean return.
+        
+        # The function `process_file_conflicts` includes detailed print statements
+        # about whether AI suggestions were applied or if the file was updated.
+        # We'll rely on its return value for overall success of processing that file.
+        
+        original_file_content = ""
+        try:
+            with open(f_path, "r", encoding="utf-8") as f:
+                original_file_content = f.read()
+        except Exception:
+            pass # Error will be handled in process_file_conflicts or if it can't read
 
-        # For now, let's assume process_file_conflicts modifies the file directly
-        # and its return indicates overall success of its operation on that file.
-        # We'll check if the file was modified by seeing if 'modified_this_file' was true inside it.
-        # This requires process_file_conflicts to perhaps return if it made changes.
-
-        # Let's adjust process_file_conflicts to return if it modified the file.
-        # process_file_conflicts(client, filepath) -> returns True if modified, False otherwise (or on error)
-
-        # Simpler: process_file_conflicts returns a status (e.g. 'MODIFIED', 'NO_AI_APPLIED', 'ERROR')
-        # For now, let's just check if any file processing leads to `modified_this_file = True`
-        # This logic needs a bit of refinement for clarity on "overall success" vs "any changes made"
-
-        if process_file_conflicts(
-            client, f_path
-        ):  # If processing itself didn't error out
-            # To know if aimerge *actually* changed something, we'd need process_file_conflicts
-            # to communicate that. For now, we assume if it runs without error, it "processed".
-            # We will rely on the print statements from within process_file_conflicts.
-            pass  # Handled by prints inside process_file_conflicts
+        if process_file_conflicts(client, f_path):
+            # Check if file was actually modified by AI
+            try:
+                with open(f_path, "r", encoding="utf-8") as f_after:
+                    if f_after.read() != original_file_content:
+                        any_ai_modifications_applied = True
+            except Exception:
+                pass # If reading after fails, assume not modified or error already reported
         else:
-            overall_success = False  # Mark if any file processing had an internal error
+            all_files_processed_successfully = False
+            print(f"WARNING: Errors encountered while processing {os.path.basename(f_path)}. It may not have been updated correctly.")
 
-    # This final message needs to be smarter based on whether actual changes were written.
-    # The current logic in process_file_conflicts handles prints about modification.
-    if overall_success and conflicted_f_paths:
-        print("\nINFO: AIMerge conflict processing round complete.")
-        print(
-            "Please review any changed files, then `git add .` and `git merge --continue` (or equivalent)."
-        )
-    elif not overall_success:
-        print("\nWARNING: Some files encountered errors during processing.")
+    print("\n--- AIMerge Processing Summary ---")
+    if not conflicted_f_paths: # Should have been caught earlier, but as a safeguard.
+        print("No conflicted files were found to process.")
+    elif all_files_processed_successfully:
+        if any_ai_modifications_applied:
+            print("INFO: All conflicted files processed. Some files were modified with Gemini AI suggestions.")
+            print("Please review the changes, then `git add .` and continue your merge (e.g., `git merge --continue`).")
+        else:
+            print("INFO: All conflicted files processed. No Gemini AI suggestions were applied to any file.")
+            print("Original conflict markers remain where AI suggestions were not chosen or could not be generated.")
+            print("You may need to resolve conflicts manually. Afterwards, `git add .` and continue your merge.")
+    else:
+        print("WARNING: Some files encountered errors during processing.")
+        print("Review the logs above. You may need to resolve conflicts manually in affected files.")
+        print("After resolving and saving, `git add .` and continue your merge.")
 
-    return 0 if overall_success else 1
+    return 0 if all_files_processed_successfully else 1
 
 
-# Ensure all helper functions (load_api_key, save_api_key, get_openai_client,
+# Ensure all helper functions (load_api_key, save_api_key, get_gemini_client,
 # find_git_repo_root, find_conflicted_files, parse_conflict_hunks, get_ai_resolution)
 # are defined above main or imported. For brevity, I'm assuming they are present
 # and using the versions from our previous discussions.
 # You'll need to copy them into this script if they aren't already.
 if __name__ == "__main__":
-    # (Copy paste all your helper functions here if not already in the file)
-    # Example placeholder for one:
-    def load_api_key():
-        # ... your implementation ...
-        api_key = os.getenv("OPENAI_API_KEY")  # Simplified for example
-        if not api_key and os.path.exists(API_KEY_FILE):
-            with open(API_KEY_FILE, "r") as f:
-                api_key = f.read().strip()
-        return api_key
-
-    def save_api_key(key):  # Placeholder
-        print(f"DEBUG: save_api_key({key}) called")
-        try:
-            os.makedirs(CONFIG_DIR, exist_ok=True)
-            with open(API_KEY_FILE, "w") as f:
-                f.write(key)
-            os.chmod(API_KEY_FILE, 0o600)
-            return True
-        except:
-            return False
-
-    def get_openai_client(key):  # Placeholder
-        print(f"DEBUG: get_openai_client({key}) called")
-        if not key:
-            return None
-        try:
-            client = OpenAI(api_key=key)
-            client.models.list()
-            return client
-        except:
-            return None
-
-    def find_git_repo_root():  # Placeholder
-        try:
-            return subprocess.run(
-                ["git", "rev-parse", "--show-toplevel"],
-                capture_output=True,
-                text=True,
-                check=True,
-            ).stdout.strip()
-        except:
-            return None
-
-    def find_conflicted_files(root):  # Placeholder
-        try:
-            res = subprocess.run(
-                ["git", "diff", "--name-only", "--diff-filter=U"],
-                cwd=root,
-                capture_output=True,
-                text=True,
-                check=True,
-            ).stdout.strip()
-            return [os.path.join(root, f) for f in res.split("\n") if f]
-        except:
-            return []
-
-    def parse_conflict_hunks(content):  # Placeholder - Use your actual good parser
-        print(f"DEBUG: parse_conflict_hunks called with content length {len(content)}")
-        # This is a VERY DUMMY parser for the example to run. Replace with your actual regex parser.
-        if "<<<<<<< HEAD" in content:
-            parts = content.split("=======")
-            if len(parts) == 2:
-                ours_part, theirs_part_full = parts[0], parts[1]
-                ours = (
-                    ours_part.split("<<<<<<< HEAD\n", 1)[1]
-                    if "<<<<<<< HEAD\n" in ours_part
-                    else ours_part
-                )
-                theirs_match = re.search(
-                    r"(.*?)\n>>>>>>> .*?\n", theirs_part_full, re.DOTALL
-                )
-                theirs = theirs_match.group(1) if theirs_match else theirs_part_full
-                original_block = content  # For this dummy, the whole file is one block
-                return [
-                    {
-                        "type": "conflict",
-                        "ours": ours,
-                        "theirs": theirs,
-                        "original_block": original_block,
-                    }
-                ]
-        return [{"type": "content", "content": content}]  # No conflict or parse failed
-
-    def get_ai_resolution(client, ours, theirs, base=None, filename=""):  # Placeholder
-        print(f"DEBUG: get_ai_resolution for {filename} called")
-        if client:  # Simulate AI or actual call (ensure quota is fixed)
-            # return f"AI RESOLVED:\n{ours}\nAND\n{theirs}", "AI explanation"
-            return None, "AI failed"  # Simulate AI failure
-        return None, None
-
     exit_code = main()
     exit(exit_code)
