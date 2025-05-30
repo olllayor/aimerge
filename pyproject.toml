@@ -53,4 +53,10 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+include = ["aimerge.py", "src/"]
+
+[dependency-groups]
+dev = [
+    "build>=1.2.2.post1",
+    "twine>=6.1.0",
+]
