@@ -5,12 +5,12 @@ description = "AI-powered Git merge conflict resolver using Google Gemini"
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [
-    {name = "Your Name", email = "your.email@example.com"}
+    {name = "AIMerge Team", email = "contact@aimerge.dev"}
 ]
 license = {text = "MIT"}
 keywords = ["git", "merge", "conflict", "ai", "gemini", "automation"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
@@ -22,20 +22,20 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "python-dotenv>=1.0.0",
-    "google-generativeai>=0.3.0",
-    "typer>=0.16.0",
-    "rich>=14.0.0",
+    "python-dotenv==1.1.0",
+    "google-generativeai==0.8.5",
+    "typer==0.16.0",
+    "rich==14.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.3.5",
-    "pytest-mock>=3.14.1",
+    "pytest==8.3.5",
+    "pytest-mock==3.14.1",
 ]
 
 [project.scripts]
-aimerge = "aimerge:main"
+aimerge = "src.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/olllayor/aimerge"
@@ -53,10 +53,10 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 
 [tool.hatch.build.targets.wheel]
-include = ["aimerge.py", "src/"]
+include = ["src/"]
 
 [dependency-groups]
 dev = [
-    "build>=1.2.2.post1",
-    "twine>=6.1.0",
+    "build==1.2.2.post1",
+    "twine==6.1.0",
 ]

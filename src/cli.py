@@ -1,10 +1,10 @@
 import typer
 from typing import List, Dict
-from conflict_detector import find_conflicts
-from conflict_parser import parse_conflicts
-from gemini_resolver import resolve_with_gemini
-from git_integration import stage_resolution
-from utils import backup_file, restore_backup
+from .conflict_detector import find_conflicts
+from .conflict_parser import parse_conflicts
+from .gemini_resolver import resolve_with_gemini
+from .git_integration import stage_resolution
+from .utils import backup_file, restore_backup
 
 app = typer.Typer()
 
