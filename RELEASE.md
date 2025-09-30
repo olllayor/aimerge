@@ -1,129 +1,85 @@
-# Release Instructions for AIMerge
+# Release Instructions for AIMerge (npm distribution)
 
-## Publishing to PyPI
+This project now ships as a Node.js package published to npm. Follow this checklist whenever you cut a new release, whether it’s a bugfix or a feature update.
 
-### Prerequisites
-1. Create accounts on:
-   - [PyPI](https://pypi.org/account/register/)
-   - [TestPyPI](https://test.pypi.org/account/register/) (optional, for testing)
+## Prerequisites
 
-2. Generate API tokens:
-   - Go to PyPI Account Settings → API tokens
-   - Create a new token with scope "Entire account" 
-   - Save the token securely (it starts with `pypi-`)
+- Maintainer access to the npm package (`aimerge`).
+- `pnpm` installed and configured (`pnpm setup` run once so the global bin directory exists).
+- Clean working tree on the branch you intend to release from (prefer `main`).
 
-### Publishing Steps
+## 1. Prepare the codebase
 
-1. **Test the package build:**
+1. Review outstanding changes with `git status` and ensure only release-ready commits remain.
+2. Update documentation/CHANGELOG if necessary.
+3. Run the quality gates:
+
    ```bash
-   cd /Users/macbookuz/Desktop/Projects/aimerge
-   uv run python -m build
-   uv run twine check dist/*
+   pnpm lint
+   pnpm test
+   pnpm build
    ```
 
-2. **Upload to TestPyPI (optional but recommended):**
-   ```bash
-   uv run twine upload --repository testpypi dist/*
-   # Enter your TestPyPI API token when prompted
-   ```
+## 2. Bump the version
 
-3. **Test installation from TestPyPI:**
-   ```bash
-   pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ aimerge
-   ```
+Use semantic versioning:
 
-4. **Upload to PyPI:**
-   ```bash
-   uv run twine upload dist/*
-   # Enter your PyPI API token when prompted
-   ```
+- Bugfix: `pnpm version patch`
+- Backwards-compatible feature: `pnpm version minor`
+- Breaking change: `pnpm version major`
 
-5. **Verify installation:**
-   ```bash
-   pip install aimerge
-   aimerge --help
-   ```
+`pnpm version` updates `package.json`, creates a git tag, and writes to the lockfile automatically. Commit the version bump (pnpm creates the commit for you; amend as needed for release notes).
 
-### Alternative: Using GitHub Actions (Recommended)
+## 3. Dry-run the package
 
-Create `.github/workflows/publish.yml`:
-```yaml
-name: Publish to PyPI
-
-on:
-  release:
-    types: [published]
-
-jobs:
-  publish:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-    - name: Install build dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build twine
-    - name: Build package
-      run: python -m build
-    - name: Publish to PyPI
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-      run: twine upload dist/*
-```
-
-Add your PyPI API token as a secret named `PYPI_API_TOKEN` in your repository settings.
-
-## Creating a Release
-
-1. **Update version in pyproject.toml** (if needed)
-2. **Commit and push changes**
-3. **Create a GitHub release:**
-   ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
-   ```
-   Then create a release on GitHub using this tag.
-
-## Package Status
-
-✅ **Completed:**
-- All bugs fixed and tests passing (19/19 tests)
-- Package configuration optimized
-- CLI tool working correctly
-- GitHub repository up to date
-- Documentation complete
-- Build artifacts created and verified
-
-✅ **Ready for Distribution:**
-- PyPI-compatible package structure
-- Proper entry points configured
-- Dependencies correctly specified
-- License and metadata included
-
-## Installation Instructions for Users
-
-Once published to PyPI, users can install with:
-```bash
-pip install aimerge
-```
-
-Or using uv:
-```bash
-uv add aimerge
-```
-
-## Usage Example
+Optionally inspect the tarball that will be published:
 
 ```bash
-# Set up API key (one time)
-aimerge --set-api-key your_gemini_api_key
-
-# Use in a repository with merge conflicts
-cd your_git_repo
-aimerge  # Will automatically detect and resolve conflicts
+pnpm build
+pnpm pack
+tar -tzf aimerge-<version>.tgz   # verify contents
+rm aimerge-<version>.tgz
 ```
+
+## 4. Authenticate once per machine
+
+```bash
+pnpm login
+```
+
+If the project enforces 2FA, have your one-time password ready. Authentication persists, so you only need to repeat this when tokens expire.
+
+## 5. Publish
+
+```bash
+pnpm publish --access public
+```
+
+If your `publish-branch` config differs from the current branch, pnpm will prompt; confirm only when releasing intentionally from a feature branch.
+
+## 6. Push commits and tags
+
+```bash
+git push origin HEAD
+git push origin --tags
+```
+
+Create a GitHub Release using the new tag and include highlights plus upgrade notes.
+
+## 7. Smoke-test the published package
+
+In a clean environment (e.g., a new terminal or `npx` call), verify installation:
+
+```bash
+pnpm add aimerge@latest
+pnpm exec aimerge --help
+```
+
+## Releasing a quick bugfix
+
+1. Implement and test the fix.
+2. `pnpm version patch`
+3. `pnpm publish --access public`
+4. Push commits/tags and update release notes.
+
+That’s it—every release follows the same flow, with the version bump conveying the scope of change.

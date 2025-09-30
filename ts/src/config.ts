@@ -43,6 +43,14 @@ export function savePreferredModel(modelId: string): void {
 	saveStoredConfig(stored);
 }
 
+export function clearPreferredModel(): void {
+	const stored = loadStoredConfig();
+	if ('preferredModel' in stored) {
+		delete stored.preferredModel;
+		saveStoredConfig(stored);
+	}
+}
+
 export function loadModelCache(maxAgeMs: number): ModelInfo[] | null {
 	if (!existsSync(MODEL_CACHE_FILE)) {
 		return null;

@@ -28,6 +28,9 @@ export interface OpenRouterResolverResult {
 	resolver: Resolver;
 	availableModels: ModelInfo[];
 	fromCache: boolean;
+	preferredModelFallback?: {
+		requestedId: string;
+	};
 }
 
 export async function createOpenRouterResolver(options: OpenRouterResolverOptions): Promise<OpenRouterResolverResult> {
@@ -44,7 +47,18 @@ export async function createOpenRouterResolver(options: OpenRouterResolverOption
 		}
 	}
 
-	const model = pickModel(models, options.preferredModelId);
+	let preferredModelFallback: string | undefined;
+	let model: ModelInfo;
+	try {
+		model = pickModel(models, options.preferredModelId);
+	} catch (error) {
+		if (options.preferredModelId && models.length) {
+			preferredModelFallback = options.preferredModelId;
+			model = pickModel(models);
+		} else {
+			throw error;
+		}
+	}
 
 	const resolver: Resolver = async ({ conflict }) => {
 		const raw = await requestCompletion(options.apiKey, model.id, conflict);
@@ -53,7 +67,13 @@ export async function createOpenRouterResolver(options: OpenRouterResolverOption
 		};
 	};
 
-	return { model, resolver, availableModels: models, fromCache: usedCache };
+	return {
+		model,
+		resolver,
+		availableModels: models,
+		fromCache: usedCache,
+		preferredModelFallback: preferredModelFallback ? { requestedId: preferredModelFallback } : undefined,
+	};
 }
 
 function sanitizeCompletion(completion: string): string {

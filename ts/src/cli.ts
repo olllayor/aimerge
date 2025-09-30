@@ -24,6 +24,7 @@ import {
 	saveApiKey,
 	getStoredConfig,
 	clearModelCache,
+	clearPreferredModel,
 } from './config.js';
 import { ConflictBlock, ModelInfo, ResolveOptions, ResolutionStats } from './types.js';
 
@@ -58,13 +59,31 @@ program
 
 			const modelSpinner = ora('Selecting best free OpenRouter model…').start();
 			const cachedModels = loadModelCache(MODEL_CACHE_TTL_MS);
-			const { model, resolver, fromCache } = await createOpenRouterResolver({
+			const { model, resolver, fromCache, preferredModelFallback } = await createOpenRouterResolver({
 				apiKey,
 				preferredModelId: preferredModel,
 				cachedModels,
 				onModelsFetched: saveModelCache,
 			});
 			modelSpinner.succeed(`Using ${model.name} (context ${model.contextLength.toLocaleString()} tokens)`);
+			if (preferredModelFallback) {
+				console.log(
+					chalk.yellow(
+						`Preferred model ${preferredModelFallback.requestedId} is unavailable among free models. Falling back to ${model.id}.`,
+					),
+				);
+				if (
+					!options.model &&
+					!process.env.AIMERGE_MODEL &&
+					runtime.preferredModel === preferredModelFallback.requestedId
+				) {
+					const stored = getStoredConfig();
+					if (stored.preferredModel === preferredModelFallback.requestedId) {
+						clearPreferredModel();
+						console.log(chalk.gray('Stored preferred model cleared from config.'));
+					}
+				}
+			}
 			if (fromCache) {
 				console.log(chalk.gray('Model list loaded from cache.'));
 			}
