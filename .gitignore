@@ -1,12 +1,59 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
+*.so
 build/
 dist/
 wheels/
 *.egg-info
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+coverage/
+.coverage
+.coverage.*
 
-# Virtual environments
+# Python environments & tooling
 .venv
 .env
-.ruff_cache/
+.env.*
+.venv*/
+.virtualenv
+.python-version
+.uv/
+
+# Node/TypeScript artifacts
+node_modules/
+lib/
+tmp/
+temp/
+*.tsbuildinfo
+pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.turbo/
+.parcel-cache/
+.pnpm-store/
+
+# Project-specific caches
+.aimerge-cache.json
+
+# Package manager metadata
+package-lock.json
+yarn.lock
+
+# OS & editor junk
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*.orig
+
+# Testing & profiling
+.nyc_output/
+coverage-final.json
+*.lcov

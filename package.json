@@ -1,0 +1,33 @@
+{
+	"name": "aimerge",
+	"version": "0.2.0",
+	"description": "AI-assisted Git merge conflict resolver",
+	"type": "module",
+	"bin": {
+		"aimerge": "./dist/cli.js"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"build:watch": "tsc -p tsconfig.json --watch",
+		"dev": "tsx ts/src/cli.ts",
+		"lint": "tsc -p tsconfig.json --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest watch"
+	},
+	"engines": {
+		"node": ">=18"
+	},
+	"dependencies": {
+		"chalk": "^5.3.0",
+		"commander": "^12.1.0",
+		"ora": "^8.0.1",
+		"boxen": "^7.1.1"
+	},
+	"devDependencies": {
+		"@types/node": "^22.5.0",
+		"tsx": "^4.16.2",
+		"ts-node": "^10.9.2",
+		"typescript": "^5.5.4",
+		"vitest": "^1.6.0"
+	}
+}

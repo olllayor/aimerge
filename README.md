@@ -1,207 +1,160 @@
-# 🤖 AIMerge - AI-Powered Git Merge Conflict Resolver
+# 🤖 AIMerge · AI-Powered Merge Conflict Resolution for Git
 
-![Python](https://img.shields.io/badge/python-3.9+-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Status](https://img.shields.io/badge/status-beta-orange.svg)
+> **New:** AIMerge now runs on Node.js + TypeScript and uses OpenRouter to tap into free, high-context AI models automatically.
 
-AIMerge is an intelligent Git merge conflict resolver that uses Google Gemini AI to automatically suggest and resolve merge conflicts. Say goodbye to manually resolving complex merge conflicts!
+AIMerge is your command-line co-pilot for merging hairy Git conflicts. It highlights conflicts in color, shows AI reasoning in a chat-style panel, and lets you accept, edit, or skip each suggestion with confidence.
 
-## ✨ Features
+## ✨ What you get
 
-- 🔍 **Automatic Conflict Detection** - Scans your Git repository for merge conflicts
-- 🤖 **AI-Powered Resolution** - Uses Google Gemini to intelligently resolve conflicts
-- 🎨 **Color-Coded Diffs** - Beautiful terminal output with syntax highlighting
-- 💬 **Interactive Mode** - Review, edit, or accept AI suggestions
-- ⚡ **Auto Mode** - Batch resolve multiple conflicts automatically
-- 🔒 **Safe Backups** - Automatically backs up files before making changes
-- 📊 **Progress Tracking** - Shows resolution statistics and progress
+- 🔍 **Conflict discovery** – Detects all conflicted files in your repo in seconds.
+- 🎨 **Readable diffs** – Rich, color-coded summaries of current vs. incoming changes.
+- 🤖 **OpenRouter integration** – Automatically picks the best *free* model (highest context window) using the OpenRouter catalog.
+- 💬 **AI “thinking” UI** – Animated terminal spinner and chat bubble output so you can watch the model work.
+- 🖊️ **Interactive & auto modes** – Review every resolution or run fully hands-off.
+- 🛟 **Safety rails** – Backups, easy restores, Git staging, and per-conflict editing in your favorite `$EDITOR`.
+- 🧠 **Configurable defaults** – Persist API keys, preferred models, and cached model lists across runs.
+
+## 🧰 Requirements
+
+- **Node.js 18+** (for native `fetch` and ES modules)
+- **Git** available on your `PATH`
+- An **OpenRouter API key** (free-tier works great)
 
 ## 🚀 Installation
 
-### Using pip (recommended):
 ```bash
-pip install aimerge
-```
-
-### Using uv:
-```bash
-uv add aimerge
-```
-
-### From source:
-```bash
+# Clone and install dependencies
 git clone https://github.com/olllayor/aimerge.git
 cd aimerge
-pip install -e .
+pnpm install
+
+# Optional: build distributable output
+pnpm build
 ```
 
-## 🔧 Setup
+You can run the CLI directly with `pnpm`/`npx`:
 
-1. **Get a Google Gemini API Key:**
-   - Visit [Google AI Studio](https://makersuite.google.com/)
-   - Create a new API key
-   - Keep it handy for the next step
+```bash
+pnpm aimerge
+# or
+pnpm dev   # hot reload via tsx
+```
 
-2. **Configure AIMerge:**
-   ```bash
-   # Set your API key (one-time setup)
-   aimerge --set-api-key YOUR_GEMINI_API_KEY
-   
-   # Or set as environment variable
-   export GEMINI_API_KEY="your-api-key-here"
-   ```
+Once the package is published you’ll also be able to install it globally:
 
-## 📖 Usage
+```bash
+pnpm add -g aimerge
+# or
+npm install -g aimerge
+```
 
-### Basic Usage
-Navigate to your Git repository with merge conflicts and run:
+## 🔑 Get an OpenRouter API key (free models)
+
+1. Visit [openrouter.ai/keys](https://openrouter.ai/keys) and create a key.
+2. Ensure at least one free-tier model is enabled (e.g. `google/gemini-flash-1.5`, `mistralai/mistral-7b-instruct`).
+3. Copy the key and store it with AIMerge:
+
+```bash
+# Persist the key in ~/.config/aimerge/config.json (or OS equivalent)
+aimerge config set-key sk-or-v1-...
+```
+
+> Prefer environment variables? Export `OPENROUTER_API_KEY` and AIMerge will pick it up automatically. Set `AIMERGE_MODEL` if you always want a specific model.
+
+## 🧭 Usage
+
+Resolve merge conflicts from the root of your Git repo:
 
 ```bash
 aimerge
 ```
 
-### Interactive Mode (default)
-```bash
-aimerge
-```
-- Review each conflict individually
-- Choose to accept, skip, or edit AI suggestions
-- Get colored diffs showing the changes
+What happens next:
 
-### Auto Mode (batch processing)
-```bash
-aimerge --auto
-```
-- Automatically resolves all conflicts without prompts
-- Great for trusted repositories or batch processing
+1. **Discovery** – AIMerge finds every file with conflict markers.
+2. **Model selection** – We call the OpenRouter models endpoint, filter to free options, and pick the one with the largest context window. The chosen model is displayed in the header.
+3. **Resolution loop** – For each conflict:
+   - A spinner shows the AI is "thinking".
+   - The proposed merge appears in a chat-style box.
+   - Choose to `[y]es`, `[n]o`, `[e]dit`, or `[s]kip`.
+4. **Commit-ready output** – Accepted resolutions replace the conflict markers, the file is staged, and a summary is printed.
 
-### Help
-```bash
-aimerge --help
-```
-
-## 🎯 How It Works
-
-1. **Detection**: AIMerge scans your Git repository for files with merge conflicts
-2. **Analysis**: Each conflict is analyzed with surrounding context
-3. **AI Resolution**: Google Gemini generates intelligent merge suggestions
-4. **Review**: You can review, edit, or accept each suggestion
-5. **Application**: Resolved conflicts are applied and staged in Git
-
-## 📋 Example Workflow
+### Useful flags
 
 ```bash
-# You have merge conflicts after a git merge
-$ git merge feature-branch
-Auto-merging src/utils.py
-CONFLICT (content): Merge conflict in src/utils.py
-
-# Run AIMerge to resolve conflicts
-$ aimerge
-INFO: AIMerge initialized with your Google Gemini API key.
-INFO: Found 1 conflicted file: src/utils.py
-
-╭─ Conflict 1/1 in src/utils.py ─╮
-│ Current (HEAD):                 │
-│ def calculate_sum(a, b):        │
-│     return a + b                │
-│                                 │
-│ Incoming (feature-branch):      │
-│ def calculate_sum(a, b, c=0):   │
-│     return a + b + c            │
-│                                 │
-│ AI Suggestion:                  │
-│ def calculate_sum(a, b, c=0):   │
-│     """Calculate sum with optional third parameter."""  │
-│     return a + b + c            │
-╰─────────────────────────────────╯
-
-Accept this resolution? [y/n/e/s]: y
-
-✅ Resolved 1/1 conflicts
+aimerge --auto                # Accept every AI resolution without prompting
+aimerge --no-interactive      # Quick batch mode (still prints summaries)
+aimerge --model mistral/...   # Force a specific OpenRouter model
 ```
 
-## 🛠️ Configuration
+### Configuration commands
 
-AIMerge supports several configuration options:
-
-### Environment Variables
 ```bash
-export GEMINI_API_KEY="your-api-key"     # Required: Your Gemini API key
-export AIMERGE_MODEL="gemini-1.5-pro"    # Optional: Specific model version
+aimerge config show           # Inspect stored + active configuration
+aimerge config use-model <id> # Persist a preferred model override
+aimerge config clear-cache    # Remove cached OpenRouter model listings
 ```
 
-### Command Line Options
+## 🎛️ How AIMerge chooses models
+
+On every run we:
+
+1. Load cached model metadata (12-hour TTL) if available.
+2. Fetch the live catalog from OpenRouter (falls back to cache if offline).
+3. Filter to models with `prompt` and `completion` pricing equal to zero.
+4. Sort by `top_provider.context_length` and pick the top entry (or your preferred model if configured).
+5. Display the model name, ID, and context window so you know exactly what’s being used.
+
+## 🧪 Developing & testing
+
 ```bash
-aimerge --help                    # Show help
-aimerge --set-api-key KEY         # Set API key
-aimerge --auto                    # Auto-resolve all conflicts
-aimerge --model gemini-1.5-flash  # Use specific model
+pnpm dev         # Run the CLI in watch mode
+pnpm build       # Emit compiled JS into dist/
+pnpm test        # Run Vitest unit tests
+pnpm lint        # Type-check the project (tsc --noEmit)
 ```
 
-## 🧪 Development
+Key directories:
 
-### Setting Up Development Environment
-```bash
-git clone https://github.com/olllayor/aimerge.git
-cd aimerge
-
-# Install with development dependencies
-pip install -e ".[dev]"
-
-# Or using uv
-uv sync
+```text
+├── ts/src/              # TypeScript source (CLI, OpenRouter, Git helpers)
+├── ts/tests/            # Vitest unit tests
+├── dist/                # Compiled output after pnpm build
+└── tests/fixtures/      # Sample merge conflict files reused by tests
 ```
 
-### Running Tests
-```bash
-pytest
-```
+## ⚙️ Environment variables
 
-### Project Structure
-```
-aimerge/
-├── src/
-│   ├── cli.py                 # Main CLI interface
-│   ├── conflict_detector.py   # Git conflict detection
-│   ├── conflict_parser.py     # Conflict parsing logic
-│   ├── gemini_resolver.py     # AI resolution logic
-│   └── git_integration.py     # Git operations
-├── tests/                     # Test suite
-└── pyproject.toml            # Project configuration
-```
+| Variable | Purpose |
+| --- | --- |
+| `OPENROUTER_API_KEY` | Overrides the stored API key. |
+| `AIMERGE_MODEL` | Force a specific model without using CLI flags. |
+| `AIMERGE_CONFIG_DIR` | Custom config directory (useful for testing). |
+| `AIMERGE_DISABLE_TYPING` | Set to `1` to disable chat typing animation. |
+
+## ❓ Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `Not a Git repository` | Run AIMerge inside a Git repo with active conflicts. |
+| `OpenRouter request failed` | Confirm your API key is valid and rate limits aren’t exceeded. Try `aimerge config clear-cache` to refresh model metadata. |
+| Empty AI response | Skip the conflict or re-run; some free models occasionally decline responses. |
+| Editor not opening with `[e]` | Ensure `$EDITOR` or `$VISUAL` is set (e.g. `export EDITOR="code -w"`). |
+
+## 🛡️ Safety notes
+
+- AIMerge writes a timestamped backup before touching each file and restores automatically on errors.
+- Changes are staged but never committed—review with `git diff --cached` before finishing.
+- Free models are great for most codebases, but you can opt into paid models for larger contexts or better accuracy.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+We welcome pull requests! A good checklist:
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+1. Fork the repo and create a feature branch.
+2. `pnpm install && pnpm lint && pnpm test` before opening the PR.
+3. Include CLI screenshots or recordings when you tweak the UI.
 
-## 📜 License
+## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## ⚠️ Disclaimer
-
-- AIMerge is in beta. Always review AI suggestions before accepting them.
-- Keep backups of important code before using auto-mode.
-- AI suggestions may not always be perfect - use your judgment.
-
-## 🙏 Acknowledgments
-
-- Google Gemini AI for providing the intelligent conflict resolution
-- The Git community for making version control awesome
-- All contributors and users of this project
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/olllayor/aimerge/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/olllayor/aimerge/discussions)
-
----
-
-Made with ❤️ for developers who hate merge conflicts
+MIT © [olllayor](https://github.com/olllayor)
