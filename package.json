@@ -3,8 +3,19 @@
 	"version": "0.2.0",
 	"description": "AI-assisted Git merge conflict resolver",
 	"type": "module",
+	"main": "./dist/src/index.js",
+	"types": "./dist/src/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/src/index.js",
+			"types": "./dist/src/index.d.ts"
+		},
+		"./cli": {
+			"import": "./dist/src/cli.js"
+		}
+	},
 	"bin": {
-		"aimerge": "./dist/cli.js"
+		"aimerge": "./dist/src/cli.js"
 	},
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
@@ -29,5 +40,10 @@
 		"ts-node": "^10.9.2",
 		"typescript": "^5.5.4",
 		"vitest": "^1.6.0"
-	}
+	},
+	"files": [
+		"dist/src/**/*",
+		"README.md",
+		"LICENSE"
+	]
 }
