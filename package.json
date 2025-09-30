@@ -1,6 +1,6 @@
 {
 	"name": "@olllayor/aimerge",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "AI-assisted Git merge conflict resolver",
 	"type": "module",
 	"main": "./dist/src/index.js",
