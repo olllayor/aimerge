@@ -27,6 +27,8 @@ import {
 	clearPreferredModel,
 } from './config.js';
 import { ConflictBlock, ModelInfo, ResolveOptions, ResolutionStats } from './types.js';
+import { shouldAutoResolve, autoResolveTrivial, isDangerous } from './conflictClassifier.js';
+import { formatConfidence } from './confidenceScorer.js';
 
 const MODEL_CACHE_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
 
@@ -38,6 +40,8 @@ program
 	.option('--auto', 'Auto-accept resolutions without confirmation', false)
 	.option('--model <modelId>', 'Use a specific OpenRouter model identifier')
 	.option('--interactive', 'Review each resolution interactively', true)
+	.option('--auto-resolve-trivial', 'Automatically resolve trivial conflicts (whitespace, comments, imports)', true)
+	.option('--min-confidence <number>', 'Minimum confidence score (0-1) to auto-accept', parseFloat, 0.7)
 	.action(async (options: ResolveOptions) => {
 		try {
 			banner();
@@ -162,7 +166,7 @@ async function processFile(
 
 		overwriteFile(filePath, content);
 		stageFile(filePath);
-		showSummary(stats.resolved, stats.skipped, conflicts.length);
+		showSummary(stats.resolved, stats.skipped, conflicts.length, stats.autoResolved);
 		console.log(chalk.green(`✅ Resolved and staged ${filePath}`));
 		safeRemove(backupPath);
 	} catch (error) {
@@ -179,23 +183,55 @@ async function resolveConflictsInFile(
 	model: ModelInfo,
 ): Promise<{ content: string; stats: ResolutionStats }> {
 	let content = fileContent;
-	const stats: ResolutionStats = { resolved: 0, skipped: 0 };
+	const stats: ResolutionStats = { resolved: 0, skipped: 0, autoResolved: 0 };
 
 	for (let index = 0; index < conflicts.length; index += 1) {
 		const conflict = conflicts[index];
-		const resolution = await withThinkingSpinner(
+		const classification = conflict.classification!;
+
+		// Display classification
+		console.log(chalk.cyan(`\n🔍 Conflict ${index + 1}/${conflicts.length}: ${classification.toUpperCase()}`));
+
+		// Show warning for dangerous conflicts
+		if (isDangerous(classification)) {
+			console.log(chalk.red('⚠️  WARNING: This is a potentially dangerous conflict that requires careful review!'));
+		}
+
+		// Try auto-resolution for trivial conflicts
+		if (shouldAutoResolve(classification) && options.autoResolveTrivial !== false) {
+			const trivialResolution = autoResolveTrivial(conflict);
+			if (trivialResolution) {
+				console.log(chalk.green('✨ Auto-resolved trivial conflict'));
+				content = applyResolution(content, conflict.fullMatch, trivialResolution);
+				stats.autoResolved = (stats.autoResolved || 0) + 1;
+				stats.resolved += 1;
+				continue;
+			}
+		}
+
+		const result = await withThinkingSpinner(
 			`🤖 Resolving conflict ${index + 1}/${conflicts.length} with ${model.name}`,
 			async () => {
-				const outcome = await resolver({ conflict, model });
-				return outcome.resolution;
+				return await resolver({ conflict, model });
 			},
 		);
 
 		// Validate resolution is not empty
-		if (!resolution || !resolution.trim()) {
+		if (!result.resolution || !result.resolution.trim()) {
 			console.log(chalk.yellow(`⚠️ AI returned empty resolution for conflict ${index + 1}, skipping...`));
 			stats.skipped += 1;
 			continue;
+		}
+
+		// Display confidence score
+		if (result.confidence) {
+			console.log(formatConfidence(result.confidence));
+
+			// Require approval for low confidence or dangerous conflicts
+			if (result.confidence.requiresApproval || isDangerous(classification)) {
+				options.interactive = true;
+				options.auto = false;
+			}
 		}
 
 		let decision = options.auto || !options.interactive ? 'y' : '';
@@ -203,17 +239,17 @@ async function resolveConflictsInFile(
 		if (options.interactive) {
 			showConflict(conflict, index + 1, conflicts.length);
 			console.log(chalk.green('💡 AI Resolution:'));
-			await renderAiMessage(resolution);
+			await renderAiMessage(result.resolution);
 			decision = await askForDecision('y');
 		}
 
 		switch (decision) {
 			case 'y':
-				content = applyResolution(content, conflict.fullMatch, resolution);
+				content = applyResolution(content, conflict.fullMatch, result.resolution);
 				stats.resolved += 1;
 				break;
 			case 'e': {
-				const edited = await openInEditor(resolution);
+				const edited = await openInEditor(result.resolution);
 				if (edited) {
 					content = applyResolution(content, conflict.fullMatch, edited);
 					stats.resolved += 1;

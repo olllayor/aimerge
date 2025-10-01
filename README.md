@@ -82,10 +82,34 @@ What happens next:
 ### Useful flags
 
 ```bash
-aimerge --auto                # Accept every AI resolution without prompting
-aimerge --no-interactive      # Quick batch mode (still prints summaries)
-aimerge --model mistral/...   # Force a specific OpenRouter model
+aimerge --auto                       # Accept every AI resolution without prompting
+aimerge --no-interactive             # Quick batch mode (still prints summaries)
+aimerge --model mistral/...          # Force a specific OpenRouter model
+aimerge --no-auto-resolve-trivial    # Disable automatic trivial conflict resolution
+aimerge --min-confidence 0.8         # Set minimum confidence threshold (0-1)
 ```
+
+### Conflict Classification
+
+AIMerge automatically classifies each conflict:
+
+- **Trivial** (✨ auto-resolved by default): Whitespace-only, comment-only, import reordering
+- **Semantic** (⚡): Variable value changes, simple code changes
+- **Logic Collision** (⚠️ dangerous): Return value conflicts, control flow changes, function redefinitions
+
+Logic collisions always require manual approval, regardless of confidence score.
+
+### Confidence Scoring
+
+Each AI resolution gets a confidence score (0-100%) based on:
+
+- Conflict classification (trivial = higher confidence)
+- Resolution length and structure
+- Syntax validity
+- Code preservation from both sides
+- Absence of confusion markers (TODOs, conflict markers)
+
+Resolutions with low confidence (<70%) automatically trigger interactive review.
 
 ### Configuration commands
 

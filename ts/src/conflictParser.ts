@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { ConflictBlock } from './types.js';
+import { classifyConflict } from './conflictClassifier.js';
+import { ASTContextExtractor } from './astExtractor.js';
 
 export function parseConflicts(filePath: string): ConflictBlock[] {
 	const content = readFileSync(filePath, 'utf8');
@@ -8,16 +10,32 @@ export function parseConflicts(filePath: string): ConflictBlock[] {
 	// Create a new regex instance each time to avoid state issues
 	const CONFLICT_REGEX = /<<<<<<<[^\n]*\n([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>>[^\n]*\n/g;
 
+	const astExtractor = new ASTContextExtractor();
+
 	let match: RegExpExecArray | null;
 	while ((match = CONFLICT_REGEX.exec(content)) !== null) {
 		const [fullMatch, current, incoming] = match;
-		conflicts.push({
+
+		const conflict: ConflictBlock = {
 			current: current.trim(),
 			incoming: incoming.trim(),
 			context: buildContext(content, match.index, fullMatch.length),
 			fullMatch,
 			filePath, // Include file path for better context
-		});
+		};
+
+		// Add classification
+		conflict.classification = classifyConflict(conflict);
+
+		// Add AST context
+		try {
+			conflict.astContext = astExtractor.extractContext(filePath, conflict.current, conflict.incoming, content);
+		} catch (error) {
+			// AST extraction is optional, continue without it
+			console.error('Failed to extract AST context:', error);
+		}
+
+		conflicts.push(conflict);
 	}
 
 	return conflicts;

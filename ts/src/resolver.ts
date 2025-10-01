@@ -1,14 +1,16 @@
 import { fetchFreeModels, pickModel, requestCompletion } from './openrouter.js';
-import { ConflictBlock, ModelInfo } from './types.js';
+import { ConflictBlock, ModelInfo, ResolutionResult } from './types.js';
 import { withRetry } from './retry.js';
 import chalk from 'chalk';
+import { calculateConfidence } from './confidenceScorer.js';
+import { classifyConflict } from './conflictClassifier.js';
 
 export interface ResolveRequest {
 	conflict: ConflictBlock;
 	model: ModelInfo | null;
 }
 
-export interface ResolveResponse {
+export interface ResolveResponse extends ResolutionResult {
 	resolution: string;
 }
 
@@ -70,8 +72,16 @@ export async function createOpenRouterResolver(options: OpenRouterResolverOption
 				console.log(chalk.yellow(`⚠️ API request failed (attempt ${attempt}), retrying... ${error.message}`));
 			},
 		});
+
+		const resolution = sanitizeCompletion(raw);
+
+		// Calculate confidence score
+		const classification = conflict.classification || classifyConflict(conflict);
+		const confidence = calculateConfidence(resolution, conflict, classification);
+
 		return {
-			resolution: sanitizeCompletion(raw),
+			resolution,
+			confidence,
 		};
 	};
 

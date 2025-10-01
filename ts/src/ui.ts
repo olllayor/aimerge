@@ -39,9 +39,12 @@ export async function askForDecision(defaultChoice: string): Promise<string> {
 	return (answer || defaultChoice).trim().toLowerCase();
 }
 
-export function showSummary(resolved: number, skipped: number, total: number): void {
+export function showSummary(resolved: number, skipped: number, total: number, autoResolved?: number): void {
 	if (resolved > 0) {
 		console.log(chalk.green(`  ➤ Resolved ${resolved}/${total} conflicts`));
+	}
+	if (autoResolved && autoResolved > 0) {
+		console.log(chalk.cyan(`  ➤ Auto-resolved ${autoResolved} trivial conflicts`));
 	}
 	if (skipped > 0) {
 		console.log(chalk.yellow(`  ➤ ${skipped} conflicts require manual attention`));
