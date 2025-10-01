@@ -82,7 +82,7 @@ export async function requestCompletion(apiKey: string, modelId: string, conflic
 			model: modelId,
 			messages: [
 				{ role: 'system', content: SYSTEM_PROMPT },
-				{ role: 'user', content: buildUserPrompt(conflict) },
+				{ role: 'user', content: buildUserPrompt(conflict, conflict.filePath) },
 			],
 			max_tokens: 2000,
 			temperature: 0.2,
@@ -91,7 +91,29 @@ export async function requestCompletion(apiKey: string, modelId: string, conflic
 
 	if (!response.ok) {
 		const errorText = await response.text();
-		throw new Error(`OpenRouter request failed (${response.status}): ${errorText}`);
+		let errorMessage = `OpenRouter request failed (${response.status})`;
+
+		// Check for rate limiting
+		if (response.status === 429) {
+			const retryAfter = response.headers.get('retry-after');
+			if (retryAfter) {
+				errorMessage += `. Rate limited. Retry after ${retryAfter} seconds`;
+			} else {
+				errorMessage += `. Rate limited. Please try again later`;
+			}
+		}
+
+		try {
+			const errorJson = JSON.parse(errorText);
+			if (errorJson.error?.message) {
+				errorMessage += `: ${errorJson.error.message}`;
+			} else {
+				errorMessage += `: ${errorText}`;
+			}
+		} catch {
+			errorMessage += `: ${errorText}`;
+		}
+		throw new Error(errorMessage);
 	}
 
 	const payload = (await response.json()) as ChatCompletionResponse;
@@ -105,12 +127,15 @@ export async function requestCompletion(apiKey: string, modelId: string, conflic
 		return content.trim();
 	}
 
-	const textPart = content.find((part) => part.type === 'text');
-	if (!textPart) {
-		throw new Error('OpenRouter response did not contain text content');
+	if (Array.isArray(content)) {
+		const textPart = content.find((part) => part.type === 'text');
+		if (!textPart) {
+			throw new Error('OpenRouter response did not contain text content');
+		}
+		return textPart.text.trim();
 	}
 
-	return textPart.text.trim();
+	throw new Error('OpenRouter returned unexpected content format');
 }
 
 function isFree(model: ApiModel): boolean {

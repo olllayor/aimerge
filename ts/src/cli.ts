@@ -191,6 +191,13 @@ async function resolveConflictsInFile(
 			},
 		);
 
+		// Validate resolution is not empty
+		if (!resolution || !resolution.trim()) {
+			console.log(chalk.yellow(`⚠️ AI returned empty resolution for conflict ${index + 1}, skipping...`));
+			stats.skipped += 1;
+			continue;
+		}
+
 		let decision = options.auto || !options.interactive ? 'y' : '';
 
 		if (options.interactive) {
@@ -227,5 +234,10 @@ async function resolveConflictsInFile(
 }
 
 function applyResolution(content: string, marker: string, resolution: string): string {
-	return content.replace(marker, `${resolution}\n`);
+	// Use indexOf to ensure we only replace the specific occurrence
+	const index = content.indexOf(marker);
+	if (index === -1) {
+		throw new Error('Conflict marker not found in content');
+	}
+	return content.slice(0, index) + `${resolution}\n` + content.slice(index + marker.length);
 }

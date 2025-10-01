@@ -1,5 +1,7 @@
 import { fetchFreeModels, pickModel, requestCompletion } from './openrouter.js';
 import { ConflictBlock, ModelInfo } from './types.js';
+import { withRetry } from './retry.js';
+import chalk from 'chalk';
 
 export interface ResolveRequest {
 	conflict: ConflictBlock;
@@ -61,7 +63,13 @@ export async function createOpenRouterResolver(options: OpenRouterResolverOption
 	}
 
 	const resolver: Resolver = async ({ conflict }) => {
-		const raw = await requestCompletion(options.apiKey, model.id, conflict);
+		const raw = await withRetry(() => requestCompletion(options.apiKey, model.id, conflict), {
+			maxAttempts: 3,
+			delayMs: 1000,
+			onRetry: (error, attempt) => {
+				console.log(chalk.yellow(`⚠️ API request failed (attempt ${attempt}), retrying... ${error.message}`));
+			},
+		});
 		return {
 			resolution: sanitizeCompletion(raw),
 		};
@@ -77,12 +85,20 @@ export async function createOpenRouterResolver(options: OpenRouterResolverOption
 }
 
 function sanitizeCompletion(completion: string): string {
-	const trimmed = completion.trim();
+	let trimmed = completion.trim();
+
+	// Remove markdown code blocks
 	if (trimmed.startsWith('```') && trimmed.endsWith('```')) {
 		const lines = trimmed.split(/\r?\n/);
 		if (lines.length >= 3) {
-			return lines.slice(1, -1).join('\n').trim();
+			trimmed = lines.slice(1, -1).join('\n').trim();
 		}
 	}
-	return trimmed;
+
+	// Remove any remaining conflict markers the AI might have included
+	trimmed = trimmed.replace(/^<{7}.*$/gm, '');
+	trimmed = trimmed.replace(/^={7}.*$/gm, '');
+	trimmed = trimmed.replace(/^>{7}.*$/gm, '');
+
+	return trimmed.trim();
 }

@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { ConflictBlock } from './types.js';
 
-const CONFLICT_REGEX = /<<<<<<<[^\n]*\n([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>>[^\n]*\n/g;
-
 export function parseConflicts(filePath: string): ConflictBlock[] {
 	const content = readFileSync(filePath, 'utf8');
 	const conflicts: ConflictBlock[] = [];
+
+	// Create a new regex instance each time to avoid state issues
+	const CONFLICT_REGEX = /<<<<<<<[^\n]*\n([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>>[^\n]*\n/g;
 
 	let match: RegExpExecArray | null;
 	while ((match = CONFLICT_REGEX.exec(content)) !== null) {
@@ -15,6 +16,7 @@ export function parseConflicts(filePath: string): ConflictBlock[] {
 			incoming: incoming.trim(),
 			context: buildContext(content, match.index, fullMatch.length),
 			fullMatch,
+			filePath, // Include file path for better context
 		});
 	}
 

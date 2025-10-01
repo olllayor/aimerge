@@ -3,6 +3,7 @@ export interface ConflictBlock {
 	incoming: string;
 	context: string;
 	fullMatch: string;
+	filePath?: string;
 }
 
 export interface ResolveOptions {
