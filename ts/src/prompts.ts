@@ -26,20 +26,23 @@ export function buildUserPrompt(conflict: ConflictBlock, filePath?: string): str
 	const fileContext = filePath ? `\nFile: ${filePath}\n` : '';
 
 	return `${fileContext}
-SURROUNDING CODE CONTEXT (what's before and after the conflict):
+SURROUNDING CODE CONTEXT (for reference only, DO NOT include in your response):
 ${conflict.context}
 
+THE ACTUAL CONFLICT TO RESOLVE:
 <<<<<<< CURRENT BRANCH (HEAD) - What's currently in your branch:
 ${conflict.current}
 =======
-
 >>>>>>> INCOMING BRANCH - What's being merged in:
 ${conflict.incoming}
 
-TASK: Analyze both changes and provide a merged version that:
-- Preserves functionality from BOTH sides if possible
-- Maintains code consistency
-- Resolves any logical conflicts intelligently
+CRITICAL INSTRUCTIONS:
+1. Analyze BOTH changes and determine the best merge strategy
+2. Return ONLY the code that should REPLACE the conflict markers (between <<<<<<< and >>>>>>>)
+3. DO NOT include the surrounding context lines in your response
+4. DO NOT include the conflict markers themselves (<<<<<<, =======, >>>>>>>)
+5. If both changes can coexist, include both in a logical order
+6. Preserve correct indentation and formatting
 
-Return ONLY the resolved code for the conflicting section:`;
+Return the merged code now:`;
 }
