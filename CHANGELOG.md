@@ -36,7 +36,8 @@
 #### 🧪 Comprehensive Testing
 - 16 tests for conflict classifier
 - 9 tests for confidence scorer
-- All 34 tests passing (previously 25)
+- 2 tests for configuration persistence
+- All 36 tests passing (previously 25)
 - Type-safe implementation with no `any` types
 
 ### Changed
@@ -45,6 +46,7 @@
 - Resolution statistics now include `autoResolved` count
 - UI summary displays auto-resolved conflicts separately
 - Package description updated to reflect new capabilities
+- Runtime configuration now persists `OPENROUTER_API_KEY` values from the environment to the config file automatically
 
 ### Fixed
 - None (this is a pure feature addition release)

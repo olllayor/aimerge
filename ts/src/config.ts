@@ -21,8 +21,14 @@ interface ModelCacheData {
 
 export function loadRuntimeConfig(): RuntimeConfig {
 	const stored = loadStoredConfig();
+	const envApiKey = process.env.OPENROUTER_API_KEY;
+
+	if (envApiKey && !stored.apiKey) {
+		stored.apiKey = envApiKey;
+		saveStoredConfig(stored);
+	}
 	return {
-		apiKey: process.env.OPENROUTER_API_KEY ?? stored.apiKey,
+		apiKey: envApiKey ?? stored.apiKey,
 		preferredModel: process.env.AIMERGE_MODEL ?? stored.preferredModel,
 	};
 }

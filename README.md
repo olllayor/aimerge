@@ -61,6 +61,8 @@ aimerge config set-key sk-or-v1-...
 
 > Prefer environment variables? Export `OPENROUTER_API_KEY` and AIMerge will pick it up automatically. Set `AIMERGE_MODEL` if you always want a specific model.
 
+Once you run AIMerge with `OPENROUTER_API_KEY` exported, the key is automatically persisted to `~/.config/aimerge/config.json` (or your platform equivalent) so you only have to export it once.
+
 ## 🧭 Usage
 
 Resolve merge conflicts from the root of your Git repo:
@@ -151,7 +153,7 @@ Key directories:
 
 | Variable | Purpose |
 | --- | --- |
-| `OPENROUTER_API_KEY` | Overrides the stored API key. |
+| `OPENROUTER_API_KEY` | Overrides the stored API key and is auto-persisted to the config file on first use. |
 | `AIMERGE_MODEL` | Force a specific model without using CLI flags. |
 | `AIMERGE_CONFIG_DIR` | Custom config directory (useful for testing). |
 | `AIMERGE_DISABLE_TYPING` | Set to `1` to disable chat typing animation. |
